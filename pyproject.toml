@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soap-army-synth"
+version = "1.0.0"
+description = "SOAP: Synthetic Operational Army Platform — A Synthea-grade state-machine synthetic data generator and PostgreSQL/GCP multi-source integration framework for U.S. Army enterprise data engineering."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Lead Data Engineering Architecture"}
+]
+dependencies = []
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1.0"]
+gcp = ["google-cloud-storage>=2.14.0", "google-cloud-bigquery>=3.17.0"]
+parquet = ["pyarrow>=15.0.0"]
+
+[project.scripts]
+soap = "soap.cli:main"

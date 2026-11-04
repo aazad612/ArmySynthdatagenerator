@@ -1,0 +1,229 @@
+{
+  "name": "equipment_lifecycle",
+  "domain": "GCSS-Army Materiel Readiness, Maintenance & Supply Class IX Lifecycle",
+  "remarks": [
+    "Models a serialized Army end-item (M1A2 Abrams, M2A4 Bradley, M109A7 Paladin, JLTV, FMTV, etc.)",
+    "across FMC operational usage, PMCS fault discovery, maintenance work orders, Class IX parts",
+    "requisitions, GFEBS financial obligations, and return to Fully Mission Capable (FMC) status."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Property_Book_Hand_Receipt"
+    },
+    "Property_Book_Hand_Receipt": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "EQUIPMENT_HAND_RECEIPT",
+      "event_prefix": "GCSSA",
+      "payload": {
+        "materiel_status": "FMC",
+        "transaction_code": "Z_PBO_RECEIPT"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "FMC_Operational_Usage_Window"
+    },
+    "FMC_Operational_Usage_Window": {
+      "type": "Delay",
+      "range": {
+        "low": 7,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Accumulate_Operating_Hours"
+    },
+    "Accumulate_Operating_Hours": {
+      "type": "Counter",
+      "attribute": "operating_hours",
+      "action": "increment",
+      "amount": 18,
+      "direct_transition": "Operator_PMCS_Inspection"
+    },
+    "Operator_PMCS_Inspection": {
+      "type": "Simple",
+      "complex_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "operating_hours",
+            "operator": ">=",
+            "value": 250
+          },
+          "distributions": [
+            { "transition": "Deadline_Fault_Detected", "distribution": 0.30 },
+            { "transition": "Trigger_Depot_Overhaul_Submodule", "distribution": 0.12 },
+            { "transition": "Minor_Fault_10_20_Level", "distribution": 0.28 },
+            { "transition": "FMC_Operational_Usage_Window", "distribution": 0.30 }
+          ]
+        },
+        {
+          "distributions": [
+            { "transition": "Deadline_Fault_Detected", "distribution": 0.16 },
+            { "transition": "Minor_Fault_10_20_Level", "distribution": 0.24 },
+            { "transition": "FMC_Operational_Usage_Window", "distribution": 0.60 }
+          ]
+        }
+      ]
+    },
+    "Trigger_Depot_Overhaul_Submodule": {
+      "type": "SetAttribute",
+      "attribute": "materiel_status",
+      "value": "NMCS",
+      "direct_transition": "Call_Depot_Overhaul_Submodule"
+    },
+    "Call_Depot_Overhaul_Submodule": {
+      "type": "CallSubmodule",
+      "submodule": "depot_overhaul_submodule",
+      "direct_transition": "FMC_Operational_Usage_Window"
+    },
+    "Minor_Fault_10_20_Level": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "MAINTENANCE_NOTIFICATION_MINOR",
+      "event_prefix": "GCSSA",
+      "payload": {
+        "maintenance_level": "FIELD_10_20",
+        "deadlining": false,
+        "materiel_status": "FMC"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "FMC_Operational_Usage_Window"
+    },
+    "Deadline_Fault_Detected": {
+      "type": "SetAttribute",
+      "attribute": "materiel_status",
+      "value": "NMCS",
+      "direct_transition": "Open_Deadlining_Work_Order"
+    },
+    "Open_Deadlining_Work_Order": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "WORK_ORDER_OPEN",
+      "event_prefix": "WO",
+      "payload": {
+        "order_type": "ZM01_CORRECTIVE_DEADLINE",
+        "priority_designator": "02_HIGH_PRIORITY",
+        "deadlining": true,
+        "materiel_status": "NMCS"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Order_Class_IX_Repair_Part"
+    },
+    "Order_Class_IX_Repair_Part": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "CLASS_IX_REQUISITION",
+      "event_prefix": "REQ",
+      "payload": {
+        "supply_class": "IX",
+        "document_identifier": "A0A_DOMESTIC_REQ",
+        "advice_code": "2B_DEADLINE_REQUIRED"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Post_GFEBS_Obligation"
+    },
+    "Post_GFEBS_Obligation": {
+      "type": "EmitEvent",
+      "source_system": "GFEBS",
+      "event_type": "FINANCIAL_OBLIGATION_POST",
+      "event_prefix": "GFEBS",
+      "payload": {
+        "appropriation": "2020_OMA",
+        "cost_element": "2600_CONSUMABLE_REPAIR_PARTS",
+        "posting_type": "OBLIGATION"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Supply_Wait_NMCS_Delay"
+    },
+    "Supply_Wait_NMCS_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 3,
+        "high": 14,
+        "unit": "days"
+      },
+      "direct_transition": "Transition_To_NMCM_Maintenance_Bay"
+    },
+    "Transition_To_NMCM_Maintenance_Bay": {
+      "type": "SetAttribute",
+      "attribute": "materiel_status",
+      "value": "NMCM",
+      "direct_transition": "Receive_Part_And_Install_Delay"
+    },
+    "Receive_Part_And_Install_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 2,
+        "high": 6,
+        "unit": "days"
+      },
+      "direct_transition": "Restore_FMC_Status"
+    },
+    "Restore_FMC_Status": {
+      "type": "SetAttribute",
+      "attribute": "materiel_status",
+      "value": "FMC",
+      "direct_transition": "Close_Work_Order_Event"
+    },
+    "Close_Work_Order_Event": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "WORK_ORDER_CLOSE",
+      "event_prefix": "WO",
+      "payload": {
+        "order_status": "TECO_TECHNICALLY_COMPLETE",
+        "materiel_status": "FMC"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Post_GFEBS_Disbursement"
+    },
+    "Post_GFEBS_Disbursement": {
+      "type": "EmitEvent",
+      "source_system": "GFEBS",
+      "event_type": "FINANCIAL_DISBURSEMENT_POST",
+      "event_prefix": "GFEBS",
+      "payload": {
+        "appropriation": "2020_OMA",
+        "cost_element": "2600_CONSUMABLE_REPAIR_PARTS",
+        "posting_type": "DISBURSEMENT"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "FMC_Operational_Usage_Window"
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "name": "personnel_lifecycle",
+  "domain": "IPPS-A / DTMS Soldier Operational Lifecycle",
+  "remarks": [
+    "Models a U.S. Army Soldier from unit assignment through garrison duty, weapons qualification,",
+    "PME / promotion boards, CTC rotations, PCS reassignments, temporary duty limits, and ETS/Retirement."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Unit_Arrival_Slotting"
+    },
+    "Unit_Arrival_Slotting": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "ASSIGNMENT_SLOTTING",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "ASG_SLOT",
+        "duty_status": "PRESENT_FOR_DUTY"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "billet_id": "billet_id",
+        "pay_grade": "pay_grade",
+        "mos": "mos"
+      },
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "Active_Garrison_Duty_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 14,
+        "high": 35,
+        "unit": "days"
+      },
+      "direct_transition": "Increment_Service_Tenure"
+    },
+    "Increment_Service_Tenure": {
+      "type": "Counter",
+      "attribute": "tig_months",
+      "action": "increment",
+      "amount": 1,
+      "direct_transition": "Evaluate_Monthly_Battle_Rhythm"
+    },
+    "Evaluate_Monthly_Battle_Rhythm": {
+      "type": " Simple",
+      "type": "Simple",
+      "complex_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "months_to_ets",
+            "operator": "<=",
+            "value": 1
+          },
+          "transition": "ETS_Separation_Event"
+        },
+        {
+          "condition": {
+            "condition_type": "And",
+            "conditions": [
+              {
+                "condition_type": "Attribute",
+                "attribute": "tig_months",
+                "operator": ">=",
+                "value": 18
+              },
+              {
+                "condition_type": "Attribute",
+                "attribute": "promotion_eligible",
+                "operator": "==",
+                "value": true
+              }
+            ]
+          },
+          "distributions": [
+            { "transition": "Check_PME_Prerequisite_Gate", "distribution": 0.35 },
+            { "transition": "Weapons_Qualification_Event", "distribution": 0.35 },
+            { "transition": "Active_Garrison_Duty_Delay", "distribution": 0.30 }
+          ]
+        },
+        {
+          "distributions": [
+            { "transition": "Weapons_Qualification_Event", "distribution": 0.30 },
+            { "transition": "CTC_Rotation_Submodule_Call", "distribution": 0.12 },
+            { "transition": "Admin_Non_Deployable_Hold", "distribution": 0.06 },
+            { "transition": "PCS_Reassignment_Event", "distribution": 0.07 },
+            { "transition": "Active_Garrison_Duty_Delay", "distribution": 0.45 }
+          ]
+        }
+      ]
+    },
+    "Check_PME_Prerequisite_Gate": {
+      "type": "Simple",
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "PriorState",
+            "name": "PME_School_Submodule_Call",
+            "within_days": 365
+          },
+          "transition": "Promotion_Selection_Event"
+        },
+        {
+          "condition": {
+            "condition_type": "True"
+          },
+          "transition": "PME_School_Submodule_Call"
+        }
+      ]
+    },
+    "PME_School_Submodule_Call": {
+      "type": "CallSubmodule",
+      "submodule": "pme_leadership_school_submodule",
+      "direct_transition": "Promotion_Selection_Event"
+    },
+    "Weapons_Qualification_Event": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "WEAPONS_QUALIFICATION",
+      "event_prefix": "DTMS",
+      "payload": {
+        "weapon_system": "M4A1_CARBINE",
+        "table": "TABLE_VI"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "mos": "mos"
+      },
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "Promotion_Selection_Event": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "PROMOTION_ORDER",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "PROMO_ADV"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade",
+        "mos": "mos"
+      },
+      "direct_transition": "Reset_Time_In_Grade"
+    },
+    "Reset_Time_In_Grade": {
+      "type": "SetAttribute",
+      "attribute": "tig_months",
+      "value": 0,
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "CTC_Rotation_Submodule_Call": {
+      "type": "CallSubmodule",
+      "submodule": "ctc_rotation_submodule",
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "Admin_Non_Deployable_Hold": {
+      "type": "SetAttribute",
+      "attribute": "deployable_flag",
+      "value": false,
+      "direct_transition": "Emit_Duty_Limitation_Status"
+    },
+    "Emit_Duty_Limitation_Status": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "READINESS_HOLD_UPDATE",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "TEMP_ADMIN_HOLD",
+        "deployable": false
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic"
+      },
+      "direct_transition": "Admin_Hold_Recovery_Delay"
+    },
+    "Admin_Hold_Recovery_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 10,
+        "high": 28,
+        "unit": "days"
+      },
+      "direct_transition": "Restore_Deployable_Status"
+    },
+    "Restore_Deployable_Status": {
+      "type": "SetAttribute",
+      "attribute": "deployable_flag",
+      "value": true,
+      "direct_transition": "Emit_Return_To_Duty"
+    },
+    "Emit_Return_To_Duty": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "READINESS_CLEARANCE",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "RTD_CLEARED",
+        "deployable": true
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic"
+      },
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "PCS_Reassignment_Event": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "PCS_TRANSFER_ORDER",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "PCS_INTRA_CORPS"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade",
+        "mos": "mos"
+      },
+      "direct_transition": "Active_Garrison_Duty_Delay"
+    },
+    "ETS_Separation_Event": {
+      "type": "EmitEvent",
+      "source_system": "IPPSA",
+      "event_type": "ETS_SEPARATION",
+      "event_prefix": "IPPSA",
+      "payload": {
+        "action_code": "ETS_HONORABLE"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade"
+      },
+      "direct_transition": "Terminal_State"
+    },
+    "Terminal_State": {
+      "type": "Terminal"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "name": "pme_leadership_school_submodule",
+  "domain": "Army University / NCO & Officer Professional Military Education (PME) Submodule",
+  "remarks": [
+    "Reusable submodule invoked via CallSubmodule before promotion board selection.",
+    "Uses Synthea lookup_table_transition to route soldiers to BLC, ALC, SLC, or Captain's Career Course (CCC) by pay_grade."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "lookup_table_transition": {
+        "rules": [
+          {
+            "match": { "pay_grade": ["E-4"] },
+            "distributions": [
+              { "transition": "Enroll_Basic_Leader_Course_BLC", "distribution": 1.0 }
+            ]
+          },
+          {
+            "match": { "pay_grade": ["E-5"] },
+            "distributions": [
+              { "transition": "Enroll_Advanced_Leader_Course_ALC", "distribution": 1.0 }
+            ]
+          },
+          {
+            "match": { "pay_grade": ["E-6", "E-7"] },
+            "distributions": [
+              { "transition": "Enroll_Senior_Leader_Course_SLC", "distribution": 1.0 }
+            ]
+          },
+          {
+            "match": { "pay_grade": ["O-2", "O-3"] },
+            "distributions": [
+              { "transition": "Enroll_Captains_Career_Course_CCC", "distribution": 1.0 }
+            ]
+          }
+        ],
+        "default_transition": "Enroll_Basic_Leader_Course_BLC"
+      }
+    },
+    "Enroll_Basic_Leader_Course_BLC": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "PME_COURSE_GRADUATION",
+      "event_prefix": "PME",
+      "payload": {
+        "weapon_system": "PME_BLC_NCO_ACADEMY",
+        "course_code": "600-BLC"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade"
+      },
+      "direct_transition": "PME_Course_Residence_Delay"
+    },
+    "Enroll_Advanced_Leader_Course_ALC": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "PME_COURSE_GRADUATION",
+      "event_prefix": "PME",
+      "payload": {
+        "weapon_system": "PME_ALC_BRANCH_SCHOOL",
+        "course_code": "600-ALC"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade"
+      },
+      "direct_transition": "PME_Course_Residence_Delay"
+    },
+    "Enroll_Senior_Leader_Course_SLC": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "PME_COURSE_GRADUATION",
+      "event_prefix": "PME",
+      "payload": {
+        "weapon_system": "PME_SLC_SERGEANTS_MAJOR_ACADEMY",
+        "course_code": "600-SLC"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade"
+      },
+      "direct_transition": "PME_Course_Residence_Delay"
+    },
+    "Enroll_Captains_Career_Course_CCC": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "PME_COURSE_GRADUATION",
+      "event_prefix": "PME",
+      "payload": {
+        "weapon_system": "PME_MANEUVER_CAPTAINS_CAREER_COURSE",
+        "course_code": "2-7-C22"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic",
+        "pay_grade": "pay_grade"
+      },
+      "direct_transition": "PME_Course_Residence_Delay"
+    },
+    "PME_Course_Residence_Delay": {
+      "type": "Delay",
+      "distribution": {
+        "kind": "GAUSSIAN",
+        "mean": 22,
+        "std_dev": 3,
+        "min": 14,
+        "max": 30,
+        "unit": "days"
+      },
+      "direct_transition": "Mark_PME_Complete"
+    },
+    "Mark_PME_Complete": {
+      "type": "SetAttribute",
+      "attribute": "pme_qualified",
+      "value": true,
+      "direct_transition": "Return_To_Parent_Module"
+    },
+    "Return_To_Parent_Module": {
+      "type": "Terminal"
+    }
+  }
+}

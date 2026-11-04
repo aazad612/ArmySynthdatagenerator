@@ -1,0 +1,116 @@
+{
+  "name": "unit_readiness_lifecycle",
+  "domain": "DTMS / NetUSR Unit Training & Monthly Readiness Reporting Lifecycle",
+  "remarks": [
+    "Models a U.S. Army Unit (UIC) stepping through collective gunnery, maneuver training,",
+    "and monthly NetUSR (Unit Status Reporting) P/S/R/T and C-rating submissions."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "FMSWeb_MTOE_Baseline_Sync"
+    },
+    "FMSWeb_MTOE_Baseline_Sync": {
+      "type": "EmitEvent",
+      "source_system": "FMSWEB",
+      "event_type": "MTOE_AUTHORIZATION_SYNC",
+      "event_prefix": "FMS",
+      "payload": {
+        "document_type": "MTOE_FY26",
+        "approval_status": "APPROVED_LOCKED"
+      },
+      "attribute_bindings": {
+        "uic": "uic",
+        "unit_name": "unit_name",
+        "echelon": "echelon"
+      },
+      "direct_transition": "Monthly_Training_Cycle_Delay"
+    },
+    "Monthly_Training_Cycle_Delay": {
+      "type": "Delay",
+      "exact": {
+        "quantity": 30,
+        "unit": "days"
+      },
+      "direct_transition": "Select_Collective_Training_Event"
+    },
+    "Select_Collective_Training_Event": {
+      "type": "Simple",
+      "distributed_transition": [
+        { "transition": "Squad_Platoon_STX_Lanes", "distribution": 0.45 },
+        { "transition": "Crew_Gunnery_Table_VI", "distribution": 0.35 },
+        { "transition": "Combined_Arms_Live_Fire_CALFEX", "distribution": 0.20 }
+      ]
+    },
+    "Squad_Platoon_STX_Lanes": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "COLLECTIVE_METL_EXERCISE",
+      "event_prefix": "DTMS",
+      "payload": {
+        "exercise_type": "PLT_STX_LANES",
+        "metl_rating": "P_PRACTICED",
+        "training_days": 5
+      },
+      "attribute_bindings": {
+        "uic": "uic",
+        "unit_name": "unit_name"
+      },
+      "direct_transition": "Emit_Monthly_NetUSR_Report"
+    },
+    "Crew_Gunnery_Table_VI": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "COLLECTIVE_METL_EXERCISE",
+      "event_prefix": "DTMS",
+      "payload": {
+        "exercise_type": "CREW_GUNNERY_TABLE_VI",
+        "metl_rating": "T_TRAINED",
+        "training_days": 10
+      },
+      "attribute_bindings": {
+        "uic": "uic",
+        "unit_name": "unit_name"
+      },
+      "direct_transition": "Emit_Monthly_NetUSR_Report"
+    },
+    "Combined_Arms_Live_Fire_CALFEX": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "COLLECTIVE_METL_EXERCISE",
+      "event_prefix": "DTMS",
+      "payload": {
+        "exercise_type": "COMPANY_CALFEX",
+        "metl_rating": "T_TRAINED",
+        "training_days": 14
+      },
+      "attribute_bindings": {
+        "uic": "uic",
+        "unit_name": "unit_name"
+      },
+      "direct_transition": "Boost_Training_Proficiency"
+    },
+    "Boost_Training_Proficiency": {
+      "type": "Counter",
+      "attribute": "metl_t_score",
+      "action": "increment",
+      "amount": 4,
+      "direct_transition": "Emit_Monthly_NetUSR_Report"
+    },
+    "Emit_Monthly_NetUSR_Report": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "MONTHLY_NETUSR_SUBMISSION",
+      "event_prefix": "USR",
+      "payload": {
+        "report_type": "REGULAR_MONTHLY_USR"
+      },
+      "attribute_bindings": {
+        "uic": "uic",
+        "unit_name": "unit_name",
+        "metl_t_score": "metl_t_score"
+      },
+      "direct_transition": "Monthly_Training_Cycle_Delay"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "name": "depot_overhaul_submodule",
+  "domain": "Sustainment BSB / Depot-Level Major Powerpack & Transmission Rebuild Submodule",
+  "remarks": [
+    "Reusable submodule invoked via CallSubmodule when high-hour combat vehicles suffer major powertrain failure.",
+    "Uses Weibull delay distribution to model realistic sustainment turnaround time."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Evacuate_To_BSB_Field_Maintenance"
+    },
+    "Evacuate_To_BSB_Field_Maintenance": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "WORK_ORDER_OPEN",
+      "event_prefix": "WO",
+      "payload": {
+        "order_type": "ZM02_SUSTAINMENT_OVERHAUL",
+        "priority_designator": "02_HIGH_PRIORITY",
+        "deadlining": true,
+        "materiel_status": "NMCS"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Requisition_Major_Assembly_Class_IX"
+    },
+    "Requisition_Major_Assembly_Class_IX": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "CLASS_IX_REQUISITION",
+      "event_prefix": "REQ",
+      "payload": {
+        "supply_class": "IX",
+        "document_identifier": "A0A_DEPOT_MAJOR_ASSEMBLY",
+        "advice_code": "2B_DEADLINE_REQUIRED"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Obligate_Depot_Rebuild_GFEBS"
+    },
+    "Obligate_Depot_Rebuild_GFEBS": {
+      "type": "EmitEvent",
+      "source_system": "GFEBS",
+      "event_type": "FINANCIAL_OBLIGATION_POST",
+      "event_prefix": "GFEBS",
+      "payload": {
+        "appropriation": "2020_OMA",
+        "cost_element": "2600_DEPOT_LEVEL_REPAIRABLE_DLR",
+        "posting_type": "OBLIGATION"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Weibull_Sustainment_Rebuild_Delay"
+    },
+    "Weibull_Sustainment_Rebuild_Delay": {
+      "type": "Delay",
+      "distribution": {
+        "kind": "WEIBULL",
+        "scale": 14.0,
+        "shape": 2.2,
+        "min": 6,
+        "max": 28,
+        "unit": "days"
+      },
+      "direct_transition": "Reset_Engine_Hours_After_Rebuild"
+    },
+    "Reset_Engine_Hours_After_Rebuild": {
+      "type": "SetAttribute",
+      "attribute": "operating_hours",
+      "value": 50,
+      "direct_transition": "Close_Depot_Work_Order"
+    },
+    "Close_Depot_Work_Order": {
+      "type": "EmitEvent",
+      "source_system": "GCSS_ARMY",
+      "event_type": "WORK_ORDER_CLOSE",
+      "event_prefix": "WO",
+      "payload": {
+        "order_status": "TECO_CLOSED",
+        "materiel_status": "FMC"
+      },
+      "attribute_bindings": {
+        "serial_number": "serial_number",
+        "equipment_number": "equipment_number",
+        "lin": "lin",
+        "uic": "owning_uic"
+      },
+      "direct_transition": "Restore_FMC_Status"
+    },
+    "Restore_FMC_Status": {
+      "type": "SetAttribute",
+      "attribute": "materiel_status",
+      "value": "FMC",
+      "direct_transition": "Submodule_Exit"
+    },
+    "Submodule_Exit": {
+      "type": "Terminal"
+    }
+  }
+}

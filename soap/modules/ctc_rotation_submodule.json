@@ -1,0 +1,54 @@
+{
+  "name": "ctc_rotation_submodule",
+  "domain": "Combat Training Center (NTC Fort Irwin) Rotation Submodule",
+  "remarks": [
+    "Reusable submodule invoked via CallSubmodule during high-OPTEMPO collective training rotations."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "RSOI_Deployment_Event"
+    },
+    "RSOI_Deployment_Event": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "CTC_ROTATION_START",
+      "event_prefix": "DTMS",
+      "payload": {
+        "training_center": "NTC_FORT_IRWIN",
+        "phase": "RSOI_AND_FORCE_ON_FORCE"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic"
+      },
+      "direct_transition": "Box_Rotation_Delay"
+    },
+    "Box_Rotation_Delay": {
+      "type": "Delay",
+      "exact": {
+        "quantity": 21,
+        "unit": "days"
+      },
+      "direct_transition": "CTC_AAR_Completion"
+    },
+    "CTC_AAR_Completion": {
+      "type": "EmitEvent",
+      "source_system": "DTMS_USR",
+      "event_type": "CTC_ROTATION_COMPLETE",
+      "event_prefix": "DTMS",
+      "payload": {
+        "training_center": "NTC_FORT_IRWIN",
+        "phase": "REDEPLOYMENT_COMPLETE"
+      },
+      "attribute_bindings": {
+        "dodid": "dodid",
+        "uic": "assigned_uic"
+      },
+      "direct_transition": "Submodule_Return"
+    },
+    "Submodule_Return": {
+      "type": "Terminal"
+    }
+  }
+}
